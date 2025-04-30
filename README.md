@@ -1,6 +1,8 @@
 # scan_jammer
 Arduino script for Scanner and Jammer with 3DR radio module and ESP32
 
+# Install Add-on in Arduino IDE
+
     http://arduino.esp8266.com/stable/package_esp8266com_index.json
     https://github.com/ArminJo/DigistumpArduino/raw/master/package_digistump_index.json
     https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
