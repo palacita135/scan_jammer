@@ -1,4 +1,3 @@
-// === RF Scanner with 433/915 Band Toggle (Pause Button Hold) + OLED UI ===
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -10,14 +9,14 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // === GPIO Definitions ===
-#define BUTTON_NEXT 32
-#define BUTTON_PAUSE 33
-#define BUTTON_RESET 25
-#define BTN_JAM_MODE 26
+#define BUTTON_NEXT  32   // Next frequency
+#define BUTTON_PAUSE 33   // Pause/Resume or hold to switch band
+#define BUTTON_RESET 25   // Reset frequency index
+#define BTN_JAM_MODE 26  // Toggle jam mode
 
 // === UART Setup ===
-#define RADIO_TX 17
-#define RADIO_RX 16
+#define RADIO_TX 17      // UART TX to 3DR Radio
+#define RADIO_RX 16      // UART RX from 3DR Radio
 
 // === Frequency Lists ===
 const uint32_t freqList433[] = {
@@ -26,22 +25,21 @@ const uint32_t freqList433[] = {
   433650000, 433700000, 433750000, 433800000, 433850000, 433900000,
   433950000, 434000000, 434050000
 };
-
 const uint32_t freqList915[] = {
   900000000, 902000000, 904000000, 906000000, 908000000,
   910000000, 912000000, 914000000, 916000000, 918000000,
   920000000, 922000000, 924000000, 926000000, 928000000
 };
 
+// === State Variables ===
 bool use433Band = true;
 bool scanning = true;
 bool jamMode = false;
-
 uint8_t freqIndex = 0;
 unsigned long lastUpdate = 0;
-const unsigned long scanInterval = 1000;
+const unsigned long scanInterval = 1000; // 1 second between scans
 
-// Debounce & Long Press
+// === Debounce & Long Press ===
 bool lastPauseButton = HIGH;
 unsigned long pausePressStart = 0;
 bool pauseHeld = false;
@@ -56,8 +54,10 @@ void setup() {
   pinMode(BTN_JAM_MODE, INPUT_PULLUP);
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    while (true); // OLED not found
+    Serial.println(F("OLED not found!"));
+    while (true);
   }
+
   display.clearDisplay();
   configure3DR();
   sendFrequencyToRadio(getCurrentFreq());
@@ -65,15 +65,14 @@ void setup() {
 }
 
 void loop() {
+  // === Pause Button Logic ===
   bool pauseButton = digitalRead(BUTTON_PAUSE);
-
   if (pauseButton == LOW && lastPauseButton == HIGH) {
     pausePressStart = millis();
     pauseHeld = false;
   }
-
   if (pauseButton == LOW && !pauseHeld && millis() - pausePressStart >= 2000) {
-    // Long press detected → Switch Band
+    // Long press: Switch band
     use433Band = !use433Band;
     freqIndex = 0;
     scanning = true;
@@ -81,32 +80,44 @@ void loop() {
     sendFrequencyToRadio(getCurrentFreq());
     drawStatus();
   }
-
   if (pauseButton == HIGH && lastPauseButton == LOW) {
     if (!pauseHeld) {
-      // Short press → Toggle pause/resume
+      // Short press: Toggle pause/resume
       scanning = !scanning;
       drawStatus();
     }
   }
   lastPauseButton = pauseButton;
 
+  // === Next Button ===
   if (digitalRead(BUTTON_NEXT) == LOW) {
-    scanning = true;
-    nextFreq();
+    delay(50); // Debounce
+    if (digitalRead(BUTTON_NEXT) == LOW) {
+      scanning = true;
+      nextFreq();
+    }
   }
 
+  // === Reset Button ===
   if (digitalRead(BUTTON_RESET) == LOW) {
-    freqIndex = 0;
-    scanning = true;
-    drawStatus();
+    delay(50); // Debounce
+    if (digitalRead(BUTTON_RESET) == LOW) {
+      freqIndex = 0;
+      scanning = true;
+      drawStatus();
+    }
   }
 
+  // === Jam Mode Button ===
   if (digitalRead(BTN_JAM_MODE) == LOW) {
-    jamMode = !jamMode;
-    drawStatus();
+    delay(50); // Debounce
+    if (digitalRead(BTN_JAM_MODE) == LOW) {
+      jamMode = !jamMode;
+      drawStatus();
+    }
   }
 
+  // === Auto-Scan ===
   if (scanning && millis() - lastUpdate > scanInterval) {
     lastUpdate = millis();
     nextFreq();
@@ -131,7 +142,6 @@ size_t getFreqListSize() {
 void sendFrequencyToRadio(uint32_t freq) {
   Serial2.print(jamMode ? "JAM " : "WATCH ");
   Serial2.println(freq);
-
   unsigned long timeout = millis() + 1000;
   String response = "";
   while (millis() < timeout) {
@@ -140,7 +150,6 @@ void sendFrequencyToRadio(uint32_t freq) {
     }
     if (response.length()) break;
   }
-
   if (response.indexOf("OK") == -1) {
     scanning = false;
     drawNoSignal();
@@ -151,22 +160,17 @@ void drawStatus() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
-
   display.setCursor(0, 0);
   display.print(scanning ? "SCANNING..." : "PAUSED");
-
   display.setCursor(0, 10);
   display.print("MODE: ");
   display.print(jamMode ? "JAM" : "WATCH");
-
   display.setCursor(0, 20);
   display.print("BAND: ");
   display.print(use433Band ? "433 MHz" : "915 MHz");
-
   display.setCursor(0, 40);
   display.print("FREQ: ");
   display.println(getCurrentFreq());
-
   display.setCursor(0, 55);
   display.print("Hold PAUSE to switch BAND");
   display.display();
