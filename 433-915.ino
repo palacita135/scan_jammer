@@ -15,8 +15,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define BTN_JAM_MODE 26  // Toggle jam mode
 
 // === UART Setup ===
-#define RADIO_TX 17      // UART TX to 3DR Radio
-#define RADIO_RX 16      // UART RX from 3DR Radio
+#define RADIO_TX 16      // UART TX to 3DR Radio
+#define RADIO_RX 17      // UART RX from 3DR Radio
 
 // === Frequency Lists ===
 const uint32_t freqList433[] = {
