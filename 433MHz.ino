@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <esp_task_wdt.h> // For ESP32 reset
 
 // === OLED Setup ===
 #define SCREEN_WIDTH 128
@@ -12,7 +13,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define BUTTON_NEXT   32   // Next frequency
 #define BUTTON_PAUSE  33   // Pause/Resume or hold to toggle jam
 #define BUTTON_RESET  25   // Reset frequency index or unlock
-#define BTN_JAM_MODE  26   // Toggle jam mode
+#define BTN_RESET_ESP 26   // Reset ESP32 (formerly BTN_JAM_MODE)
 
 // === UART Setup ===
 #define RADIO_RX 16      // Connect to 3DR Radio TX
@@ -48,7 +49,7 @@ void setup() {
   pinMode(BUTTON_NEXT, INPUT_PULLUP);
   pinMode(BUTTON_PAUSE, INPUT_PULLUP);
   pinMode(BUTTON_RESET, INPUT_PULLUP);
-  pinMode(BTN_JAM_MODE, INPUT_PULLUP);
+  pinMode(BTN_RESET_ESP, INPUT_PULLUP);
 
   // Initialize OLED
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
@@ -91,6 +92,19 @@ void setup() {
 }
 
 void loop() {
+  // === Reset ESP32 Button ===
+  if (digitalRead(BTN_RESET_ESP) == LOW) {
+    delay(50); // Debounce
+    if (digitalRead(BTN_RESET_ESP) == LOW) {
+      display.clearDisplay();
+      display.println("RESETTING ESP32...");
+      display.display();
+      Serial.println("Resetting ESP32...");
+      delay(1000);
+      ESP.restart(); // Reset ESP32
+    }
+  }
+
   // === Pause Button Logic ===
   bool pauseButton = digitalRead(BUTTON_PAUSE);
   if (pauseButton == LOW && lastPauseButton == HIGH) {
@@ -289,8 +303,7 @@ void drawStatus() {
   display.println("Hold PAUSE to jam");
 
   display.setCursor(0, 50);
-  display.print("Signal: ");
-  display.println(frequencyLocked ? "LOCKED" : "NONE");
+  display.print("Press BTN to reset");
 
   display.display();
 }
